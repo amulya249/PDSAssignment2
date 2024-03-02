@@ -92,7 +92,7 @@ print(data)
 
 #arrange
 arrangequery = data.sort_values(by='Price', ascending=False)
-print(arrangequery)
+print(arrangequery.head(5))
 
 #Summarize
 summaryquery = data.groupby('Fuel_Type').agg(Average_Price=('Price', 'mean'), Average_Age=('new_age', 'mean')).reset_index()
