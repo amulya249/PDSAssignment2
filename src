@@ -1,91 +1,100 @@
-a)import pandas as pd
+pip install islp
+
+#splitting the values and the units into different columns
+
+import pandas as pd
+import numpy as np
 from sklearn.impute import SimpleImputer
-df = pd.read_csv('train.csv')
-print(df.isnull().sum())
-for column in df.columns:
-    if df[column].isnull().sum() > 0:  # if there are missing values in the column
-        if df[column].dtype == 'object':  # if the column is categorical
-            mode_value = df[column].mode()[0]
-            df[column].fillna(mode_value, inplace=True)
-        else:  # if the column is numerical
-            mean_value = df[column].mean()
-            df[column].fillna(mean_value, inplace=True)
+data = pd.read_csv('train.csv')
+data['New_Price'] = data['New_Price'].astype(str)
+# Create new columns for lakhs and crores
+data['In_Lakhs'] = data['New_Price'].apply(lambda x: float(x.split()[0]) if 'Lakh' in x else (float(x.split()[0]) if 'Cr' in x else None))  # spliting the values and units in different columns
+data['Units'] = data['New_Price'].apply(lambda x: 'Lakh' if 'Lakh' in x else ('Cr' if 'Cr' in x else None))
 
 
-Justification for Action
-Imputation: Chosen to maximize the use of available data, especially if the missingness is low or can be systematically accounted for.
-It's crucial when the dataset is small, or the missing data holds significant predictive power or information.
+data['New'] = np.where(data['Units'] == 'Lakh', data['In_Lakhs'] * 1, data['In_Lakhs'])  #converting crores into lakhs and storing in new column
+data['New'] = np.where(data['Units'] == 'Cr', data['New'] * 100, data['New'])
+#data['New_Prices'] = data['In_Lakhs'].where(data['Units'] == 'Lakh', data['In_Lakhs'] * 100)
+#updated records
+data_sorted = data.sort_values(by='New', ascending=False)
+print(data_sorted)
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+a) Look for the missing values in all the columns and either impute them (replace with mean, median, or mode) or drop them. Justify your action for this task
+Answer:
 
-Dropping: Selected when the missing data is too extensive to be reliably imputed without introducing bias, or when the column with
-missing values is not critical for the analysis. Dropping rows is a last resort, typically reserved for when the missingness pattern
-indicates that imputation would lead to misleading conclusions.
+print(data.isnull().sum())
+for column in data.columns:
+    if data[column].isnull().sum() > 0:  # if there are missing values
+        if data[column].dtype == 'object':  # for categorical
+            mode_value = data[column].mode()[0]
+            data[column].fillna(mode_value, inplace=True) #replace with mode
+        else:  # for numerical column
+            mean_value = data[column].mean()
+            data[column].fillna(mean_value, inplace=True) #Replace with mean
+print(data.isnull().sum())
+print(data)
 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+b) Remove the units from some of the attributes and only keep the numerical values (for example remove kmpl from “Mileage”, CC from “Engine”, bhp from “Power”, and lakh from “New_price”).
+Answer:
 
-b)
-# First, ensure the columns you want to manipulate are of type string
+data['Mileage'] = data['Mileage'].astype(str)
+data['Engine'] = data['Engine'].astype(str)
+data['Power'] = data['Power'].astype(str)
+data['New_Price']=data['New_Price'].astype(str)
 
-df['Mileage'] = df['Mileage'].astype(str)
-df['Engine'] = df['Engine'].astype(str)
-df['Power'] = df['Power'].astype(str)
+def fun(column_name, unit):
+    data[column_name] = data[column_name].str.replace(unit + r'\s*', '', case=False, regex=True)
+    data[column_name] = pd.to_numeric(data[column_name], errors='coerce')
+    return data[column_name]
 
-# Now, you can safely apply your remove_unit_and_convert function
-# Ensure this function handles the conversion properly, including using .str accessor
-# For demonstration, here's a simplified version of what the function might look like:
+data['Mileage'] = fun('Mileage', 'kmpl|km/kg')  
+data['Engine'] = fun('Engine', 'CC')
+data['Power'] = fun('Power', 'bhp')
+data['New_Price']=fun('New_Price', 'lakh')
 
-def remove_unit_and_convert(column_name, unit):
-    # This will remove the unit from each entry and convert to float
-    # It assumes the unit is at the end of each string
-    return df[column_name].str.replace(unit, '').astype(float)
+print(data.info())
+print(data.head(5))
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+C) Change the categorical variables (“Fuel_Type” and “Transmission”) into numerical one hot encoded value.
+Answer:
 
-# Applying the function (assuming it's correctly implemented above)
-df['Mileage'] = remove_unit_and_convert('Mileage', ' kmpl')
-df['Engine'] = remove_unit_and_convert('Engine', ' CC')
-df['Power'] = remove_unit_and_convert('Power', ' bhp')
+data1 = pd.get_dummies(data, columns=['Fuel_Type', 'Transmission'])
+print(data1.head(10))
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+d) Create one more feature and add this column to the dataset (you can use mutate function in R for this). For example, you can calculate the current age of the car by subtracting “Year” value from the current year.
+Answer:
 
-print(df)
+# let the year be 2024
+year = 2024
+#creating a new column for the calculated age
+data['new_age'] = year - data['Year']
+print(data)
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+e) Perform select, filter, rename, mutate, arrange and summarize with group by operations (or their equivalent operations in python) on this dataset.
+Answer:
 
-c)
-# Convert categorical variables into one-hot encoded columns
-# 'pd.get_dummies' automatically handles the conversion of categorical columns into one-hot encoded format
-df1 = pd.get_dummies(df, columns=['Fuel_Type', 'Transmission'])
+#select
+selectquery_data = data[['Name', 'Year', 'Price']]
+print(selectquery_data)
 
-# Display the new DataFrame with one-hot encoded columns
-print("\nDataFrame after One-Hot Encoding:")
-print(df1)
+#filter
+filterquery_data = data[(data['Year'] > 2016) & (data['Fuel_Type'] == 'Diesel')]
+print(filterquery_data)
 
+#rename
+data = data.rename(columns={'Kilometers_Driven': 'KMs_Driven'})
+print(data)
 
-d)
+#mutate
+data['CarAge'] = 2020 - data['Year']
+print(data)
 
-# Assuming the current year is 2024
-current_year = 2024
-
-# Calculate the age of the car and create a new column
-df['Car_Age'] = current_year - df['Year']
-
-print(df)
-
-
-e)
-select
-selectquery_df = df[['Name', 'Year', 'Price']]
-print(selectquery_df)
-
-filter
-filterquery_df = df[(df['Year'] > 2016) & (df['Fuel_Type'] == 'Diesel')]
-print(filterquery_df)
-
-rename
-df = df.rename(columns={'Kilometers_Driven': 'KMs_Driven'})
-print(df)
-
-mutate
-df['CarAge'] = 2020 - df['Year']
-print(df)
-
-arrange
-arrangequery = df.sort_values(by='Price', ascending=False)
+#arrange
+arrangequery = data.sort_values(by='Price', ascending=False)
 print(arrangequery)
 
-Summaeize
-summaryquery = df.groupby('Fuel_Type').agg(Average_Price=('Price', 'mean'), Average_Age=('Car_Age', 'mean')).reset_index()
+#Summarize
+summaryquery = data.groupby('Fuel_Type').agg(Average_Price=('Price', 'mean'), Average_Age=('new_age', 'mean')).reset_index()
 print(summaryquery)
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
